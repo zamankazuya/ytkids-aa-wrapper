@@ -22,7 +22,7 @@ class MainCarActivity : CarActivity() {
             isCar = true,
             onExit = {
                 sessionController?.destroy()
-                finish()
+                System.exit(0)
             }
         )
         sessionController = controller
