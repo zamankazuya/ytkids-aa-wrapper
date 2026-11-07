@@ -1,16 +1,21 @@
 package com.ytkids.auto
 
 import android.annotation.SuppressLint
+import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
+import android.widget.FrameLayout
 import com.google.android.apps.auto.sdk.CarActivity
 
 class MainCarActivity : CarActivity() {
@@ -28,16 +33,54 @@ class MainCarActivity : CarActivity() {
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_car_main)
 
-        // Safely hide status bar / app header if supported by the SDK version
+        // Safely hide status bar / app header if supported by the SDK
         try {
             carUiController?.statusBarController?.hideTitle()
         } catch (_: Throwable) {
         }
 
-        webView = findViewById(R.id.webview) as WebView
-        btnExit = findViewById(R.id.btn_exit) as Button
+        val ctx = baseContext
+
+        // 1. Create fullscreen FrameLayout container programmatically
+        val rootLayout = FrameLayout(ctx).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            setBackgroundColor(Color.BLACK)
+        }
+
+        // 2. Create fullscreen WebView
+        webView = WebView(ctx).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+
+        // 3. Create floating Exit button in top-right corner
+        val marginPx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, 16f, ctx.resources.displayMetrics
+        ).toInt()
+
+        btnExit = Button(ctx).apply {
+            text = "Exit"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#CCFF0000"))
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.TOP or Gravity.END
+                setMargins(marginPx, marginPx, marginPx, marginPx)
+            }
+        }
+
+        rootLayout.addView(webView)
+        rootLayout.addView(btnExit)
+
+        setContentView(rootLayout)
 
         setupExitButton()
         setupWebView()
