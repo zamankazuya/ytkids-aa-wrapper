@@ -1,6 +1,7 @@
 package com.ytkids.auto
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
@@ -16,17 +17,19 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import com.google.android.apps.auto.sdk.CarActivity
 
 class MainCarActivity : CarActivity() {
 
     private lateinit var webView: WebView
-    private lateinit var btnExit: Button
+    private lateinit var controlBar: LinearLayout
     private val hideHandler = Handler(Looper.getMainLooper())
+    private var currentZoom = 125 // Default 125% zoom
 
     private val hideRunnable = Runnable {
-        if (::btnExit.isInitialized) {
-            btnExit.visibility = View.GONE
+        if (::controlBar.isInitialized) {
+            controlBar.visibility = View.GONE
         }
     }
 
@@ -34,15 +37,15 @@ class MainCarActivity : CarActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Safely hide status bar / app header if supported by the SDK
         try {
             carUiController?.statusBarController?.hideTitle()
         } catch (_: Throwable) {
         }
 
         val ctx = baseContext
+        val prefs = ctx.getSharedPreferences("ytkids_prefs", Context.MODE_PRIVATE)
+        currentZoom = prefs.getInt("zoom_percent", 125)
 
-        // 1. Create fullscreen FrameLayout container programmatically
         val rootLayout = FrameLayout(ctx).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -51,7 +54,6 @@ class MainCarActivity : CarActivity() {
             setBackgroundColor(Color.BLACK)
         }
 
-        // 2. Create fullscreen WebView
         webView = WebView(ctx).apply {
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -59,15 +61,13 @@ class MainCarActivity : CarActivity() {
             )
         }
 
-        // 3. Create floating Exit button in top-right corner
         val marginPx = TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP, 16f, ctx.resources.displayMetrics
+            TypedValue.COMPLEX_UNIT_DIP, 12f, ctx.resources.displayMetrics
         ).toInt()
 
-        btnExit = Button(ctx).apply {
-            text = "Exit"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#CCFF0000"))
+        // Top-right container holding [-], [+], and [Exit]
+        controlBar = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -77,30 +77,69 @@ class MainCarActivity : CarActivity() {
             }
         }
 
+        val btnZoomOut = Button(ctx).apply {
+            text = " - "
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#AA333333"))
+            setOnClickListener {
+                changeZoom(-15, prefs)
+                resetHideTimer()
+            }
+        }
+
+        val btnZoomIn = Button(ctx).apply {
+            text = " + "
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#AA333333"))
+            setOnClickListener {
+                changeZoom(15, prefs)
+                resetHideTimer()
+            }
+        }
+
+        val btnExit = Button(ctx).apply {
+            text = "Exit"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#CCFF0000"))
+            setOnClickListener {
+                hideHandler.removeCallbacks(hideRunnable)
+                try {
+                    webView.loadUrl("about:blank")
+                    webView.destroy()
+                } catch (_: Throwable) {
+                }
+                System.exit(0)
+            }
+        }
+
+        controlBar.addView(btnZoomOut)
+        controlBar.addView(btnZoomIn)
+        controlBar.addView(btnExit)
+
         rootLayout.addView(webView)
-        rootLayout.addView(btnExit)
+        rootLayout.addView(controlBar)
 
         setContentView(rootLayout)
 
-        setupExitButton()
         setupWebView()
-    }
-
-    private fun setupExitButton() {
-        btnExit.setOnClickListener {
-            hideHandler.removeCallbacks(hideRunnable)
-            try {
-                webView.loadUrl("about:blank")
-                webView.destroy()
-            } catch (_: Throwable) {
-            }
-            System.exit(0)
-        }
         resetHideTimer()
     }
 
+    private fun changeZoom(delta: Int, prefs: android.content.SharedPreferences) {
+        currentZoom = (currentZoom + delta).coerceIn(50, 300)
+        prefs.edit().putInt("zoom_percent", currentZoom).apply()
+        applyCssZoom()
+    }
+
+    private fun applyCssZoom() {
+        webView.evaluateJavascript(
+            "document.body.style.zoom = '${currentZoom}%';",
+            null
+        )
+    }
+
     private fun resetHideTimer() {
-        btnExit.visibility = View.VISIBLE
+        controlBar.visibility = View.VISIBLE
         hideHandler.removeCallbacks(hideRunnable)
         hideHandler.postDelayed(hideRunnable, 5000L)
     }
@@ -116,10 +155,11 @@ class MainCarActivity : CarActivity() {
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
         settings.mediaPlaybackRequiresUserGesture = false
-        settings.useWideViewPort = true
-        settings.loadWithOverviewMode = true
 
-        // Force Desktop Chrome User-Agent so YouTube Kids loads the web player
+        // Disable wide overview shrinking so elements render at readable DPI size
+        settings.useWideViewPort = false
+        settings.loadWithOverviewMode = false
+
         settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
                 "AppleWebKit/537.36 (KHTML, like Gecko) " +
                 "Chrome/122.0.0.0 Safari/537.36"
@@ -127,6 +167,7 @@ class MainCarActivity : CarActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                applyCssZoom()
                 CookieManager.getInstance().flush()
             }
         }
