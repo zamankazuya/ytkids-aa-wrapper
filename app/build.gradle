@@ -33,8 +33,6 @@ android {
 }
 
 dependencies {
-    // Unofficial Android Auto SDK placed in app/libs/auto-sdk.aar
-    implementation files('libs/auto-sdk.aar')
-
+    implementation 'com.github.martoreto:aauto-sdk:v4.0'
     implementation 'androidx.core:core-ktx:1.12.0'
 }
