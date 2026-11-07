@@ -65,7 +65,7 @@ class MainCarActivity : CarActivity() {
             TypedValue.COMPLEX_UNIT_DIP, 12f, ctx.resources.displayMetrics
         ).toInt()
 
-        // Top-right container holding [-], [+], and [Exit]
+        // Top-right container holding [< Back], [-], [+], and [Exit]
         controlBar = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = FrameLayout.LayoutParams(
@@ -74,6 +74,18 @@ class MainCarActivity : CarActivity() {
             ).apply {
                 gravity = Gravity.TOP or Gravity.END
                 setMargins(marginPx, marginPx, marginPx, marginPx)
+            }
+        }
+
+        val btnBack = Button(ctx).apply {
+            text = "< Back"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#AA333333"))
+            setOnClickListener {
+                if (webView.canGoBack()) {
+                    webView.goBack()
+                }
+                resetHideTimer()
             }
         }
 
@@ -112,6 +124,7 @@ class MainCarActivity : CarActivity() {
             }
         }
 
+        controlBar.addView(btnBack)
         controlBar.addView(btnZoomOut)
         controlBar.addView(btnZoomIn)
         controlBar.addView(btnExit)
@@ -155,8 +168,6 @@ class MainCarActivity : CarActivity() {
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
         settings.mediaPlaybackRequiresUserGesture = false
-
-        // Disable wide overview shrinking so elements render at readable DPI size
         settings.useWideViewPort = false
         settings.loadWithOverviewMode = false
 
