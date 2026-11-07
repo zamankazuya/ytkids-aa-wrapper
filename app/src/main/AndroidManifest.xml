@@ -10,25 +10,34 @@
         android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
 
-        <!-- Phone Launcher Activity -->
+        <!-- Phone Instance -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:screenOrientation="sensorLandscape">
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|uiMode">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- Official Android Auto Car App Service -->
+        <!-- Android Auto Projection Descriptor -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
+        <!-- Car Projection Service -->
         <service
-            android:name=".YtKidsCarService"
+            android:name=".CarService"
             android:exported="true"
-            android:permission="androidx.car.app.permission.CAR_APP">
+            android:icon="@mipmap/ic_ytkids"
+            android:label="YT Kids">
             <intent-filter>
-                <action android:name="androidx.car.app.CarAppService" />
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="com.google.android.gms.car.category.CATEGORY_PROJECTION" />
+                <category android:name="com.google.android.gms.car.category.CATEGORY_PROJECTION_OEM" />
             </intent-filter>
         </service>
 
