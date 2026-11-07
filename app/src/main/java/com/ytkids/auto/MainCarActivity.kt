@@ -25,7 +25,7 @@ class MainCarActivity : CarActivity() {
     private lateinit var webView: WebView
     private lateinit var controlBar: LinearLayout
     private val hideHandler = Handler(Looper.getMainLooper())
-    private var currentZoom = 125 // Default 125% zoom
+    private var carZoom = 120 // Default 120% zoom on car display
 
     private val hideRunnable = Runnable {
         if (::controlBar.isInitialized) {
@@ -44,7 +44,7 @@ class MainCarActivity : CarActivity() {
 
         val ctx = baseContext
         val prefs = ctx.getSharedPreferences("ytkids_prefs", Context.MODE_PRIVATE)
-        currentZoom = prefs.getInt("zoom_percent", 125)
+        carZoom = prefs.getInt("zoom_car", 120)
 
         val rootLayout = FrameLayout(ctx).apply {
             layoutParams = ViewGroup.LayoutParams(
@@ -139,16 +139,25 @@ class MainCarActivity : CarActivity() {
     }
 
     private fun changeZoom(delta: Int, prefs: android.content.SharedPreferences) {
-        currentZoom = (currentZoom + delta).coerceIn(50, 300)
-        prefs.edit().putInt("zoom_percent", currentZoom).apply()
-        applyCssZoom()
+        carZoom = (carZoom + delta).coerceIn(50, 300)
+        prefs.edit().putInt("zoom_car", carZoom).apply()
+        applyViewportAndZoom()
     }
 
-    private fun applyCssZoom() {
-        webView.evaluateJavascript(
-            "document.body.style.zoom = '${currentZoom}%';",
-            null
-        )
+    private fun applyViewportAndZoom() {
+        val js = """
+            (function() {
+                var meta = document.querySelector('meta[name="viewport"]');
+                if (!meta) {
+                    meta = document.createElement('meta');
+                    meta.name = 'viewport';
+                    document.head.appendChild(meta);
+                }
+                meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
+                document.documentElement.style.zoom = '${carZoom}%';
+            })();
+        """.trimIndent()
+        webView.evaluateJavascript(js, null)
     }
 
     private fun resetHideTimer() {
@@ -163,22 +172,23 @@ class MainCarActivity : CarActivity() {
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(webView, true)
 
-        val settings = webView.settings
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.databaseEnabled = true
-        settings.mediaPlaybackRequiresUserGesture = false
-        settings.useWideViewPort = false
-        settings.loadWithOverviewMode = false
-
-        settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-                "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                "Chrome/122.0.0.0 Safari/537.36"
+        webView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            databaseEnabled = true
+            mediaPlaybackRequiresUserGesture = false
+            // Match the car head unit's landscape projection resolution
+            useWideViewPort = true
+            loadWithOverviewMode = true
+            userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+                    "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                    "Chrome/122.0.0.0 Safari/537.36"
+        }
 
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                applyCssZoom()
+                applyViewportAndZoom()
                 CookieManager.getInstance().flush()
             }
         }
