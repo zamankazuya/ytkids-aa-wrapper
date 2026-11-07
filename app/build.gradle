@@ -33,6 +33,6 @@ android {
 }
 
 dependencies {
-    implementation 'com.github.martoreto:aauto-sdk:v4.0'
+    implementation files('libs/auto-sdk.aar')
     implementation 'androidx.core:core-ktx:1.12.0'
 }
