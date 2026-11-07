@@ -1,10 +1,38 @@
-package com.ytkids.auto
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
 
-import com.google.android.apps.auto.sdk.CarActivity
-import com.google.android.apps.auto.sdk.CarActivityService
+android {
+    namespace 'com.ytkids.auto'
+    compileSdk 34
 
-class CarService : CarActivityService() {
-    override fun getCarActivity(): Class<out CarActivity> {
-        return MainCarActivity::class.java
+    defaultConfig {
+        applicationId "com.ytkids.auto"
+        minSdk 26
+        targetSdk 33
+        versionCode 6
+        versionName "1.5"
     }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    implementation files('libs/auto-sdk.jar')
+    implementation 'androidx.core:core-ktx:1.12.0'
 }
