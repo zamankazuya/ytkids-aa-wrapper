@@ -3,6 +3,9 @@ package com.ytkids.auto
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
@@ -31,6 +34,9 @@ class YtKidsSessionController(
     private lateinit var controlBar: LinearLayout
     private var webView: WebView? = null
 
+    private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private var audioFocusRequest: AudioFocusRequest? = null
+
     private val hideHandler = Handler(Looper.getMainLooper())
     private val zoomKey = if (isCar) "zoom_car" else "zoom_phone"
     private var currentZoom = prefs.getInt(zoomKey, if (isCar) 125 else 100)
@@ -42,10 +48,45 @@ class YtKidsSessionController(
     }
 
     init {
+        requestAudioFocus()
         buildUi()
     }
 
     fun getView(): View = rootLayout
+
+    private fun requestAudioFocus() {
+        try {
+            if (audioFocusRequest == null) {
+                val attrs = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
+                    .build()
+
+                audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                    .setAudioAttributes(attrs)
+                    .setAcceptsDelayedFocusGain(true)
+                    .setOnAudioFocusChangeListener { focusChange ->
+                        if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
+                            // Pause video temporarily during phone calls or voice prompts
+                            webView?.evaluateJavascript(
+                                "document.querySelectorAll('video').forEach(v => v.pause());",
+                                null
+                            )
+                        }
+                    }
+                    .build()
+            }
+            audioFocusRequest?.let { audioManager.requestAudioFocus(it) }
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        try {
+            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+        } catch (_: Throwable) {
+        }
+    }
 
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     private fun buildUi() {
@@ -55,7 +96,6 @@ class YtKidsSessionController(
         )
         rootLayout.setBackgroundColor(Color.BLACK)
 
-        // Safely instantiate WebView (falls back to applicationContext if CarActivity context is restricted)
         val createdWebView = try {
             WebView(uiContext)
         } catch (_: Throwable) {
@@ -153,7 +193,6 @@ class YtKidsSessionController(
                     "Chrome/122.0.0.0 Safari/537.36"
         }
 
-        // Prevent native JS alert/prompt dialogs from crashing CarActivity WindowManager
         wv.webChromeClient = object : WebChromeClient() {
             override fun onJsAlert(
                 view: WebView?,
@@ -180,6 +219,7 @@ class YtKidsSessionController(
                     prefs.edit().putString("last_url", url).apply()
                 }
                 applyViewportAndZoom()
+                requestAudioFocus()
                 try {
                     CookieManager.getInstance().flush()
                 } catch (_: Throwable) {
@@ -189,6 +229,7 @@ class YtKidsSessionController(
 
         wv.setOnTouchListener { _, event ->
             if (event != null && event.action == MotionEvent.ACTION_DOWN) {
+                requestAudioFocus()
                 resetHideTimer()
             }
             false
@@ -226,6 +267,7 @@ class YtKidsSessionController(
     }
 
     fun syncOnResume() {
+        requestAudioFocus()
         currentZoom = prefs.getInt(zoomKey, if (isCar) 125 else 100)
         val syncedUrl = prefs.getString("last_url", null)
         val currentUrl = webView?.url
@@ -257,6 +299,7 @@ class YtKidsSessionController(
 
     fun destroy() {
         hideHandler.removeCallbacks(hideRunnable)
+        abandonAudioFocus()
         try {
             CookieManager.getInstance().flush()
             webView?.loadUrl("about:blank")
